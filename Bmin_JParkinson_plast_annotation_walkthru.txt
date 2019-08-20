@@ -1,0 +1,277 @@
+Running PLAST on local computer (Mac) to make annotation files for a transcriptome
+
+##### ##### ##### ##### ##### ##### ##### 
+##### Annotating the transcriptome #####
+##### ##### ##### ##### ##### ##### ##### 
+
+
+# make a directory for the transcriptome
+mkdir Bminutum_JParkinson_Plast
+
+# Download the fasta database
+# ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz
+# I recently downloaded it and have it in another directory, so I'm just going to use that
+
+# Example header from query database
+>sp|Q6GZX4|001R_FRG3G Putative transcription factor 001R OS=Frog virus 3 (isolate Goorha) OX=654924 GN=FV3-001R PE=4 SV=1
+MAFSAEDVLKEYDRRRRMEALLLSLYYPNDRKLLDYKEWSPPRVQVECPKAPVEWNNPPS
+EKGLIVGHFSGIKYKGEKAQASEVDVNKMCCWVSKFKDAMRRYQGIQTCKIPGKVLSDLD
+
+# move the transcriptome fasta (the query) into this directory
+cp min_assembly_longest_250.fa ../Bminutum_JParkinson_Plast/
+
+# make a play-with copy
+head -200 min_assembly_longest_250.fa > transcriptome.fa
+# this is 100 transcripts out of ~50k
+
+# Example header from transcriptome file
+>comp2_c0_seq1
+CGCCCATGGGACCGTTAAAGCT
+ACTCTCTGGCGGCAGCAGGGCTTCCTTGAGACGTTCCTCGGCCTCGAGCAGGTCCACGAA
+
+# run PLAST
+plast -p plastx -i transcriptome.fa -d ../uniprot_files/uniprot_sprot.fasta -e 1e-4 -max-hit-per-query 1 -max-hsp-per-hit 1 -o plastresults.pr &
+
+# -p is the type of plast. plastx takes a nucleotide input and searches against an amino acid database
+# -i is the input file (what you are wanting to annotate)
+# -d is the database to query (what you are searching against)
+# -e is the e-value cutoff
+# -o is your output file
+# -Q 5
+# & runs the command in the background
+
+# check on progress
+jobs
+[1]+  Done                    plast -p plastx -i transcriptome.fa -d ../uniprot_files/uniprot_sprot.fasta -e 1e-4 -max-hit-per-query 1 -max-hsp-per-hit 1 -o plastresults.pr
+
+wc -l plastresults.pr 
+# number will increase as job runs
+
+head plastresults.pr 
+
+#qseqid 			sseqid 					pident 	length 	mismatch 	gapopen 	qstart 	qend 	sstart send 	evalue bitscore
+# comp240_c0_seq1	sp|P80197|AFK_PHYPO		31.68	101		61			6			316		26		496		592		5e-07	53.1
+# comp54_c0_seq1	sp|P84996|ALEX_HUMAN	32.11	109		64			5			307		2		305		410		3e-05	47.4
+# comp163_c0_seq1	sp|E5RJM6|ANR65_HUMAN	34.68	124		70			3			405		34		32		144		5e-06	49.7
+
+# this test finished in under 1 min
+
+# remove the test files
+rm plastresults.pr 
+rm transcriptome.fa 
+
+# run the whole transcriptome
+plast -p plastx -i min_assembly_longest_250.fa -d ../uniprot_files/uniprot_sprot.fasta -e 1e-4 -max-hit-per-query 1 -max-hsp-per-hit 1 -o plastresults.pr &
+
+# start 10AM
+
+# caffeinate your mac so it doesn't go to sleep while this job is running
+# first, find the PID of your process
+ps -ax | tail
+# find your process in this list (I piped to "tail" because it should be near the end of the list)
+# example
+29813 ttys000    1:07.93 plast -p plastx -i min_assembly_longest_250.fa -d ../uniprot_files/uniprot_sprot.fasta -e 1e-4 -max-hit-per-query 1 -max-hsp-per-hit 1 -o plastresults.pr
+
+caffeinate -i -w 29813 &
+
+# caffeinate is the program that keeps the computer from going idle
+# -i flag prevents the system from sleeping
+# -w flag waits for the process with the specified PID to exit
+# 29813 is the PID of my plast job (see above)
+# & means "run in the background" so that I can continue to use the terminal
+
+# job finished by noon!
+# run time ~ 2 hr on local computer
+
+# head plastresults.pr
+#qseqid 	sseqid 					pident length 	mismatch 	gapopen qstart 	qend 	sstart 	send 	evalue bitscore
+c43_g2_i1	sp|Q99996|AKAP9_HUMAN	20.04	569		392	28		238		1881	2010	2536	6e-08	60.1
+c51_g1_i1	sp|P70083|AT2A1_MAKNI	55.12	1025	413	26		94		3126	1		992		1e-254	880.2
+
+# how many annotations?
+wc -l plastresults.pr 
+# 86859 plastresults.pr
+
+# how many isogroups in transcriptome?
+grep ">" min_assembly_longest_250.fa | wc -l
+# 51199
+
+# so we have lots of non-unique hits in the plast results... how many are unique?
+# sort by trancsript ID and then by e-value ('g' makes it interpret the exponent properly)
+# then look for instances where the first column (transcript ID) is unique
+cat plastresults.pr | sort -k1,1 -k11,11g | awk '!seen[$1]++' | wc -l
+# 18474
+
+# make a file that only has the unique results (save lowest e-value for each transcript)
+cat plastresults.pr | sort -k1,1 -k11,11g | awk '!seen[$1]++' > uniq_plastresults.pr
+
+head uniq_plastresults.pr 
+
+#comp10000_c0_seq1	sp|Q50KB1|SEP2_EMIHU	39.15	212	121	6	738	118	1	209	3e-34	145.6
+#comp10001_c0_seq1	sp|Q8LKI3|ALB32_CHLRE	29.69	256	161	7	1782	1039	73	317	2e-32	141.4
+#comp10002_c0_seq1	sp|O06179|Y1533_MYCTU	36.26	262	133	6	1171	392	132	361	1e-24	114.8
+
+
+#### Make annotation files (iso2gene, iso2go)
+
+# for trinity-assembled transcriptomes: annotating with "isogroup" (=component)
+grep ">" min_assembly_longest_250.fa | perl -pe 's/>comp(\d+)(\S+)+/comp$1$2\tisogroup$1/' > Bmin_transcriptome_seq2iso.tab
+
+head Bmin_transcriptome_seq2iso.tab 
+#comp2_c0_seq1	isogroup2
+#comp4_c0_seq1	isogroup4
+
+
+cat min_assembly_longest_250.fa | perl -pe 's/>comp(\d+)(\S+)+/>comp$1$2 gene=isogroup$1/' > Bmin_transcriptome_iso.fasta
+
+head Bmin_transcriptome_iso.fasta 
+#>comp2_c0_seq1 gene=isogroup2
+#CGCCCATGGGACCGTTAAAGCTGTTGTTGACA
+
+cat uniq_plastresults.pr | sed 's/comp/isogroup/' |  sed 's/_c[0-9]_seq[0-9]//'> uniq_plastresults_isogroup.pr
+
+head uniq_plastresults_isogroup.pr 
+
+#isogroup10000	sp|Q50KB1|SEP2_EMIHU	39.15	212	121	6	738	118	1	209	3e-34	145.6
+#isogroup10001	sp|Q8LKI3|ALB32_CHLRE	29.69	256	161	7	1782	1039	73	317	2e-32	141.4
+
+# how many unique isogroups in plastresults now?
+cat uniq_plastresults_isogroup.pr | sort -u -k1,1 | wc -l
+# 18474
+
+# only keep the top hit (lowest e-value... looks like most of them are the same anyway)
+cat uniq_plastresults_isogroup.pr | sort -k1,1 -k11,11g | awk '!seen[$1]++' > uniq_plastresults_isogroup_top.pr
+
+# 18474 uniq_plastresults_isogroup_top.pr
+
+# how many unique isogroups in the seq2iso? -- all of them
+cat Bmin_transcriptome_seq2iso.tab | sort -u -k2,2 | wc -l
+# 51199
+
+##### ##### ##### ##### ##### ##### ##### #####
+##### Gene description and GO annotations #####
+##### ##### ##### ##### ##### ##### ##### #####
+
+##### make an iso2gene name file
+# pull out the gene names from the uniprot fasta file
+grep ">" uniprot_sprot.fasta | awk '{print $1}' | sed 's/>sp[|]//' | sed 's/[|].*//' > geneIDs
+grep ">" uniprot_sprot.fasta | awk '{$1="";print $0}' > geneDescriptions
+paste geneIDs geneDescriptions > longGeneNames
+
+# match up the genes with the second field in the plastresults file...
+cat uniq_plastresults_isogroup_top.pr  | awk {'print $1"\t"$2'} > iso2gene.tab
+cat iso2gene.tab | awk -F '[|]' {'print $1"\t"$2'} | cut -f1,3 > iso2shortgene.tab
+
+#### Make annotation files (iso2gene, iso2go)
+##### make an iso2gene name file
+# the uniprot files are in another directory
+# ../uniprot_files
+
+# make gene description file
+# file 1 = iso2shortgene.tab
+# column 1 = isogroup; column 2 = short gene ID
+# file 2 = ../uniprot_files/longGeneNames
+# column 1 = short gene ID; column 2 = gene description
+
+join -1 2 -2 1 -e "noMatch" -t $'\t' <(sort -k2 iso2shortgene.tab) <(sort -k1 ../uniprot_files/longGeneNames) | awk 'BEGIN {FS="\t"; OFS="\t"} {print $2, $1, $3}' > Bmin_iso2geneDescription.tab 
+
+wc -l Bmin_iso2geneDescription.tab 
+# 18474 Bmin_iso2geneDescription.tab
+
+# download the uniprot id_mapping table
+# ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/
+# it's 28GB so it's takes awhile... keep it somewhere separate on your computer and update periodically
+# in other words, don't download a new version every time you run the analysis
+# I'm using version 7/31/2019 in this instance (15 August 2019)
+
+head idmapping_selected.tab
+
+# Q6GZX4	001R_FRG3G	2947773	YP_031579.1	81941549; 49237298		GO:0046782	UniRef100_Q6GZX4	UniRef90_Q6GZX4	UniRef50_Q6GZX4	UPI00003B0FD4		654924		15165820	AY548484	AAT09660.1				
+# Q6GZX3	002L_FRG3G	2947774	YP_031580.1	49237299; 81941548; 47060117		GO:0033644; GO:0016021	UniRef100_Q6GZX3	UniRef90_Q6GZX3	UniRef50_Q6GZX3	UPI00003B0FD5		654924			15165820	AY548484	AAT09661.1				
+# Q197F8	002R_IIV3	4156251	YP_654574.1	109287880; 123808694; 106073503			UniRef100_Q197F8	UniRef90_Q197F8	UniRef50_Q197F8	UPI0000D83464		345201		16912294	DQ643392	ABF82032.1
+
+# fields in the file...
+1. UniProtKB-AC
+2. UniProtKB-ID
+3. GeneID (EntrezGene)
+4. RefSeq
+5. GI
+6. PDB
+7. GO
+8. UniRef100
+9. UniRef90
+10. UniRef50
+11. UniParc
+12. PIR
+13. NCBI-taxon
+14. MIM
+15. UniGene
+16. PubMed
+17. EMBL
+18. EMBL-CDS
+19. Ensembl
+20. Ensembl_TRS
+21. Ensembl_PRO
+22. Additional PubMed
+
+# make gene ontology file
+# file 1 = iso2shortgene.tab
+# column 1 = isogroup; column 2 = short gene ID
+# file 2 = ../uniprot_files/idmapping_selected.tab
+# column 1 = short gene ID; column 7 = gene description
+
+#run test
+head -10000 idmapping_selected.tab > testidmmapping_selected.tab
+
+join -1 2 -2 1 -e "noMatch" -t $'\t' <(sort -k2 iso2shortgene.tab) <(sort -k1 ../uniprot_files/testidmmapping_selected.tab) | awk 'BEGIN {FS="\t"; OFS="\t"} {print $2, $1, $8}' > Bmin_iso2go.tab
+
+head Bmin_iso2go.tab 
+#isogroup65396	A0A0H3LKL4	GO:0043731; GO:0071949; GO:0019439
+#isogroup87560	A0P8X0	GO:0005576; GO:0004556; GO:0103025; GO:2001070; GO:0005983
+#isogroup67810	A1IGV8	GO:0033953; GO:0005509; GO:0030246; GO:0007155; GO:0000272
+
+# run full job
+join -1 2 -2 1 -e "noMatch" -t $'\t' <(sort -k2 iso2shortgene.tab) <(sort -k1 ../uniprot_files/idmapping_selected.tab) | awk 'BEGIN {FS="\t"; OFS="\t"} {print $2, $1, $8}' > Bmin_iso2go.tab
+
+# started 9am
+# job finished sometime around 12pm
+# runtime ~ 3 hrs on personal computer
+
+# check and make sure the files look OK
+
+head Bmin_iso2go.tab 
+# isogroup40267	A0A024SH76	GO:0005576; GO:0016162; GO:0030248; GO:0030245
+# isogroup20340	A0A024SNB7	GO:0005576; GO:0008810; GO:0030248; GO:0030245
+
+# Number of isogroups in transcriptome
+grep ">" min_assembly_longest_250.fa | wc -l
+#51199
+
+# Number of isogroups in unique PLAST results
+wc -l uniq_plastresults_isogroup_top.pr 
+# 18474
+
+# Number of isogroups in iso2gene description
+wc -l Bmin_iso2geneDescription.tab 
+# 18474
+
+# Number of "noMatch" in iso2GO
+grep "noMatch" Bmin_iso2go.tab | wc -l
+# 540
+
+# Number of GO hits in iso2go
+grep "GO" Bmin_iso2go.tab | wc -l
+# 17934
+
+# do these numbers add up to the total number of lines in the iso2go file? (sanity check)
+expr 17934 + 540
+# 18474
+# YES
+
+# Do these annotations match the previous BLAST annotations?
+# note... those were annotated awhile ago and the uniprot files get updated pretty often
+# we expect some differences
+
+# I put copies the BLAST iso2go and iso2gene and PLAST iso2go and iso2gene files in a test directory
+# blast_iso2gene.tab blast_iso2go.tab   plast_iso2gene.tab plast_iso2go.tab
+# running the comparisons in R to make plots and summary stats
