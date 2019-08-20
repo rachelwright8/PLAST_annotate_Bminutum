@@ -14,6 +14,7 @@ head(blast_gene)
 
 plast_gene <- read.delim("plast_iso2gene.tab", header=F)
 head(plast_gene)
+
 # get rid of second column (not in BLAST)
 plast_gene <- plast_gene %>% select(V1,V3)
 head(plast_gene)
@@ -105,7 +106,7 @@ blast_go  <- blast_go [!blast_go $V2=="-",]
 head(blast_go )
 
 # load plast annotations for GO
-plast_go <- read.delim("../testgo.tab", header=F)
+plast_go <- read.delim("plast_iso2go.tab", header=F)
 head(plast_go)
 
 # get rid of second column (short gene ID) that isn't in the blast file
