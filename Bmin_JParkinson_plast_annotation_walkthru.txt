@@ -1,5 +1,26 @@
 Running PLAST on local computer (Mac) to make annotation files for a transcriptome
 
+##### ##### ##### ##### ##### ##### 
+##### Installing the software ##### 
+##### ##### ##### ##### ##### ##### 
+
+# Download the software
+https://plast.inria.fr/download-plast/
+
+# Unpack in command line
+tar -xvf plastbinary_osx_v2.3.1.tar.gz
+
+# Move unpacked directory to home
+mv plastbinary_osx_20160121 ~/
+
+# Export path
+# copy and paste the full path to .bash_profile {replace with your path}
+PATH=/Users/rachel/plastbinary_osx_20160121:"$PATH"  
+
+# close the terminal and reopen to change the path settings
+# the following command should show the new path to plastbinary
+$PATH
+
 ##### ##### ##### ##### ##### ##### ##### 
 ##### Annotating the transcriptome #####
 ##### ##### ##### ##### ##### ##### ##### 
